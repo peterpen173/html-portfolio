@@ -8,7 +8,7 @@
   :root{
     --bg:#11141a; --panel:#191d26; --panel-2:#212734; --line:#2c3341;
     --text:#e8ecf2; --muted:#96a0b1; --yes:#31c48d; --no:#f05252;
-    --accent:#f0b429; --radius:14px;
+    --accent:#f0b429; --own:#76a9fa; --radius:14px;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
@@ -42,6 +42,28 @@
   .choose button{flex:1;padding:15px;border:none;border-radius:var(--radius);
                  font-size:17px;font-weight:600;cursor:pointer;color:#11141a}
   .b-no{background:var(--no)} .b-yes{background:var(--yes)}
+  .b-own{background:transparent;border:1px solid var(--own);color:var(--own);
+         padding:10px;border-radius:var(--radius);font-size:15px;font-weight:600;
+         cursor:pointer;width:100%;max-width:460px}
+
+  /* ---- collection stats ---- */
+  .kpis{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .kpi{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);
+       border-radius:var(--radius);padding:16px}
+  .kpi span{color:var(--muted);font-size:12.5px;display:block;margin-bottom:6px}
+  .kpi b{font-size:28px;font-weight:700;line-height:1.1;display:block}
+  .kpi small{color:var(--muted);font-size:12px}
+  .ranked{background:var(--panel);border:1px solid var(--line);
+          border-radius:var(--radius);padding:16px;margin-bottom:18px}
+  .ranked h3{margin:0 0 3px;font-size:15px}
+  .ranked .sub{color:var(--muted);font-size:12.5px;margin-bottom:14px}
+  .bar-row{display:grid;grid-template-columns:minmax(90px,190px) 1fr auto;
+           gap:10px;align-items:center;padding:4px 0;border-radius:6px}
+  .bar-row:hover{background:var(--panel-2)}
+  .bar-row .nm{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .track{height:11px;background:var(--panel-2);border-radius:4px;overflow:hidden}
+  .bar{height:100%;background:var(--own);border-radius:4px}
+  .bar-row .val{font-size:12.5px;color:var(--muted);min-width:96px;text-align:start}
   .undo{background:transparent;border:1px solid var(--line);color:var(--muted);
         padding:7px 16px;border-radius:99px;cursor:pointer}
   .counts{color:var(--muted);font-size:13px;text-align:center}
@@ -103,6 +125,7 @@
     <button data-tab="swipe" class="on">סימון</button>
     <button data-tab="new">חדשים <span id="newBadge"></span></button>
     <button data-tab="yes">רשימת הכן <span id="yesBadge"></span></button>
+    <button data-tab="owned">האוסף שלי <span id="ownBadge"></span></button>
     <button data-tab="no">דחויים</button>
     <button data-tab="settings">הגדרות</button>
   </nav>
@@ -136,9 +159,10 @@
         <button class="b-yes" onclick="decide(1)">כן</button>
         <button class="b-no" onclick="decide(0)">לא</button>
       </div>
+      <button class="b-own" onclick="decide(2)">כבר יש לי את הסט הזה</button>
       <button class="undo" onclick="undo()">ביטול הסימון האחרון</button>
       <div class="counts" id="counts"></div>
-      <div class="hint">מקלדת: ← לא · → כן · Z ביטול</div>
+      <div class="hint">מקלדת: ← לא · → כן · ↑ כבר יש לי · Z ביטול</div>
     </div>
   </section>
 
@@ -147,6 +171,7 @@
 
   <!-- ============ YES / NO ============ -->
   <section id="tab-yes" class="hidden"></section>
+  <section id="tab-owned" class="hidden"></section>
   <section id="tab-no" class="hidden"></section>
 
   <!-- ============ SETTINGS ============ -->
@@ -207,7 +232,7 @@ const DEFAULT_TAX = {exempt:75, vat:18, rate:3.7};
 let catalog = null;      // parsed catalog.json
 let byNum = new Map();   // set_num -> row
 let newSets = [];        // new_sets.json entries
-let decisions = load(LS.dec, {});   // set_num -> 1 (yes) / 0 (no)
+let decisions = load(LS.dec, {});   // set_num -> 1 (yes) / 0 (no) / 2 (owned)
 let tax = Object.assign({}, DEFAULT_TAX, load(LS.tax, {}));
 let gh = load(LS.gh, {repo:'', branch:'main', token:''});
 let queue = [], qi = 0, history = [];
@@ -300,11 +325,11 @@ function renderCard(){
       </div></div>`;
   }
   const d = Object.keys(decisions).length;
-  const yes = Object.values(decisions).filter(v => v === 1).length;
+  const yes = countOf(1), own = countOf(2);
   document.getElementById('counts').innerHTML =
     `נותרו בסינון: <b>${num(Math.max(queue.length - qi, 0))}</b> ·
      סומנו בסך הכל: <b>${num(d)}</b> מתוך ${num(catalog.sets.length)} ·
-     ברשימת הכן: <b>${num(yes)}</b>`;
+     ברשימת הכן: <b>${num(yes)}</b> · באוסף: <b>${num(own)}</b>`;
 }
 
 function decide(v){
@@ -334,6 +359,7 @@ addEventListener('keydown', e => {
   // The page is RTL but the arrow keys stay physical: left = no, right = yes.
   if(e.key === 'ArrowLeft') decide(0);
   else if(e.key === 'ArrowRight') decide(1);
+  else if(e.key === 'ArrowUp') decide(2);
   else if(e.key.toLowerCase() === 'z') undo();
 });
 
@@ -341,19 +367,28 @@ addEventListener('keydown', e => {
   document.getElementById(id).addEventListener('input', buildQueue));
 
 // ---------- lists ----------
+function countOf(v){ return Object.values(decisions).filter(x => x === v).length; }
+
 function renderBadges(){
-  const yes = Object.values(decisions).filter(v => v === 1).length;
+  const yes = countOf(1), own = countOf(2);
   document.getElementById('yesBadge').textContent = yes ? `(${yes})` : '';
+  document.getElementById('ownBadge').textContent = own ? `(${own})` : '';
   const pending = newSets.filter(s => !(s.num in decisions)).length;
   document.getElementById('newBadge').textContent = pending ? `(${pending})` : '';
 }
 
+const ACTS = {
+  yes: r => `<button class="primary" onclick="togglePrices('${esc(r[0])}')">איפה הכי זול</button>
+             <button onclick="setDecision('${esc(r[0])}',2)">קניתי</button>
+             <button onclick="setDecision('${esc(r[0])}',0)">הסרה</button>`,
+  owned: r => `<button onclick="setDecision('${esc(r[0])}',1)">החזרה לרשימת הכן</button>
+               <button onclick="setDecision('${esc(r[0])}',null)">איפוס</button>`,
+  no: r => `<button onclick="setDecision('${esc(r[0])}',1)">העברה לרשימת הכן</button>
+            <button onclick="setDecision('${esc(r[0])}',null)">איפוס</button>`,
+};
+
 function rowHtml(r, kind){
-  const acts = kind === 'yes'
-    ? `<button class="primary" onclick="togglePrices('${esc(r[0])}')">איפה הכי זול</button>
-       <button onclick="setDecision('${esc(r[0])}',0)">הסרה</button>`
-    : `<button onclick="setDecision('${esc(r[0])}',1)">העברה לרשימת הכן</button>
-       <button onclick="setDecision('${esc(r[0])}',null)">איפוס</button>`;
+  const acts = ACTS[kind](r);
   return `<div class="row">
     ${r[5] ? `<img src="${esc(imgOf(r))}" alt="" loading="lazy">` : '<div style="width:82px"></div>'}
     <div class="info"><b>${esc(r[1])}</b>
@@ -363,20 +398,63 @@ function rowHtml(r, kind){
   </div><div id="p-${esc(r[0])}"></div>`;
 }
 
+const WANT = {yes: 1, no: 0, owned: 2};
+const EMPTY_MSG = {
+  yes: 'רשימת הכן ריקה עדיין.',
+  no: 'אין סטים דחויים.',
+  owned: 'עוד לא סימנת אף סט כקנוי.<br>סמני "כבר יש לי" בלשונית הסימון, או "קניתי" ברשימת הכן.',
+};
+
 function renderList(kind){
-  const want = kind === 'yes' ? 1 : 0;
+  const want = WANT[kind];
   const rows = Object.keys(decisions)
     .filter(n => decisions[n] === want && byNum.has(n))
     .map(n => byNum.get(n))
     .sort((a,b) => b[2]-a[2] || b[4]-a[4]);
   const el = document.getElementById('tab-' + kind);
+  const stats = kind === 'owned' ? statsHtml(rows) : '';
   if(!rows.length){
-    el.innerHTML = `<div class="empty">${kind === 'yes' ? 'רשימת הכן ריקה עדיין.' : 'אין סטים דחויים.'}</div>`;
+    el.innerHTML = `<div class="empty">${EMPTY_MSG[kind]}</div>`;
     return;
   }
-  el.innerHTML = `<div class="filters"><input id="q-${kind}" placeholder="סינון ברשימה"
+  el.innerHTML = stats + `<div class="filters"><input id="q-${kind}" placeholder="סינון ברשימה"
       oninput="filterList('${kind}')" style="flex:1"></div>
     <div id="list-${kind}">${rows.map(r => rowHtml(r, kind)).join('')}</div>`;
+}
+
+// Magnitude for one series: a single hue, no legend, values direct-labelled.
+function statsHtml(rows){
+  const sets = rows.length;
+  const parts = rows.reduce((a, r) => a + r[4], 0);
+  const avg = sets ? Math.round(parts / sets) : 0;
+  const biggest = rows.reduce((a, r) => (!a || r[4] > a[4]) ? r : a, null);
+
+  const byTheme = new Map();
+  for(const r of rows){
+    const t = themeOf(r);
+    const cur = byTheme.get(t) || {sets: 0, parts: 0};
+    cur.sets++; cur.parts += r[4];
+    byTheme.set(t, cur);
+  }
+  const ranked = [...byTheme.entries()].sort((a, b) => b[1].parts - a[1].parts);
+  const top = ranked.slice(0, 10);
+  const max = top.length ? top[0][1].parts : 1;
+
+  return `<div class="kpis">
+      <div class="kpi"><span>סטים באוסף</span><b>${num(sets)}</b></div>
+      <div class="kpi"><span>חלקים שהרכבתי</span><b>${num(parts)}</b></div>
+      <div class="kpi"><span>ממוצע לסט</span><b>${num(avg)}</b>
+        <small>${biggest ? `הגדול ביותר: ${esc(biggest[1])} (${num(biggest[4])})` : ''}</small></div>
+    </div>
+    <div class="ranked">
+      <h3>חלקים לפי סדרה</h3>
+      <div class="sub">${num(ranked.length)} סדרות באוסף${ranked.length > 10 ? ', מוצגות 10 הגדולות' : ''}</div>
+      ${top.map(([name, v]) => `<div class="bar-row" title="${esc(name)}: ${num(v.parts)} חלקים ב־${num(v.sets)} סטים">
+          <div class="nm">${esc(name)}</div>
+          <div class="track"><div class="bar" style="width:${(v.parts / max * 100).toFixed(1)}%"></div></div>
+          <div class="val">${num(v.parts)} · ${num(v.sets)} סטים</div>
+        </div>`).join('')}
+    </div>`;
 }
 
 function filterList(kind){
@@ -391,7 +469,7 @@ function setDecision(n, v){
   save(LS.dec, decisions);
   renderBadges();
   const active = document.querySelector('nav button.on').dataset.tab;
-  if(active === 'yes' || active === 'no') renderList(active);
+  if(active in WANT) renderList(active);
   if(active === 'new') renderNew();
 }
 
@@ -415,6 +493,7 @@ function renderNew(){
       <div class="acts">
         <button class="primary" onclick="setDecision('${esc(s.num)}',1)">כן</button>
         <button onclick="setDecision('${esc(s.num)}',0)">לא</button>
+        <button onclick="setDecision('${esc(s.num)}',2)">כבר יש לי</button>
       </div></div>`).join('');
 }
 
@@ -605,9 +684,9 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.remove('on'));
   b.classList.add('on');
   const tab = b.dataset.tab;
-  ['swipe','new','yes','no','settings'].forEach(t =>
+  ['swipe','new','yes','owned','no','settings'].forEach(t =>
     document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab));
-  if(tab === 'yes' || tab === 'no') renderList(tab);
+  if(tab in WANT) renderList(tab);
   if(tab === 'new') renderNew();
   if(tab === 'settings') fillSettings();
   location.hash = tab;
