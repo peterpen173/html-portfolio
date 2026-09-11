@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מעקב לגו</title>
+<style>
+  :root{
+    --bg:#11141a; --panel:#191d26; --panel-2:#212734; --line:#2c3341;
+    --text:#e8ecf2; --muted:#96a0b1; --yes:#31c48d; --no:#f05252;
+    --accent:#f0b429; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.55 "Segoe UI",Rubik,Arial,sans-serif}
+  a{color:var(--accent)}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+         padding:14px 18px;background:var(--panel);border-bottom:1px solid var(--line);
+         position:sticky;top:0;z-index:20}
+  h1{font-size:17px;margin:0;font-weight:600}
+  nav{display:flex;gap:6px;flex-wrap:wrap;margin-inline-start:auto}
+  nav button{background:transparent;border:1px solid var(--line);color:var(--muted);
+             padding:6px 13px;border-radius:99px;cursor:pointer;font-size:14px}
+  nav button.on{background:var(--accent);border-color:var(--accent);color:#11141a;font-weight:600}
+  main{max-width:1000px;margin:0 auto;padding:18px}
+  .hidden{display:none!important}
+
+  /* ---- swipe card ---- */
+  .stage{display:flex;flex-direction:column;align-items:center;gap:16px}
+  .card{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--line);
+        border-radius:var(--radius);overflow:hidden}
+  .shot{aspect-ratio:4/3;background:#fff;display:flex;align-items:center;justify-content:center}
+  .shot img{max-width:100%;max-height:100%;object-fit:contain}
+  .meta{padding:14px 16px 16px}
+  .meta h2{font-size:18px;margin:0 0 4px}
+  .theme{color:var(--accent);font-size:13px;margin-bottom:12px}
+  .facts{display:flex;gap:8px;flex-wrap:wrap}
+  .fact{background:var(--panel-2);border-radius:8px;padding:6px 11px;font-size:13px}
+  .fact b{display:block;font-size:15px;font-weight:600}
+  .fact span{color:var(--muted);font-size:11px}
+  .choose{display:flex;gap:12px;width:100%;max-width:460px}
+  .choose button{flex:1;padding:15px;border:none;border-radius:var(--radius);
+                 font-size:17px;font-weight:600;cursor:pointer;color:#11141a}
+  .b-no{background:var(--no)} .b-yes{background:var(--yes)}
+  .undo{background:transparent;border:1px solid var(--line);color:var(--muted);
+        padding:7px 16px;border-radius:99px;cursor:pointer}
+  .counts{color:var(--muted);font-size:13px;text-align:center}
+  .counts b{color:var(--text)}
+  .hint{color:var(--muted);font-size:12px;text-align:center}
+
+  /* ---- lists ---- */
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  input,select{background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+               padding:8px 11px;border-radius:8px;font:inherit;font-size:14px}
+  .row{display:flex;gap:12px;align-items:center;background:var(--panel);
+       border:1px solid var(--line);border-radius:var(--radius);padding:10px;margin-bottom:9px}
+  .row img{width:82px;height:62px;object-fit:contain;background:#fff;border-radius:7px;flex:none}
+  .row .info{flex:1;min-width:0}
+  .row .info b{display:block;font-size:15px}
+  .row .info small{color:var(--muted);display:block;font-size:12.5px}
+  .row .acts{display:flex;gap:6px;flex-none;flex-wrap:wrap;justify-content:flex-end}
+  .row .acts button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+                    padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+  .row .acts button.primary{background:var(--accent);border-color:var(--accent);
+                            color:#11141a;font-weight:600}
+
+  /* ---- price panel ---- */
+  .prices{background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius);
+          padding:16px;margin:-4px 0 12px}
+  .prices h3{margin:0 0 4px;font-size:16px}
+  .prices .sub{color:var(--muted);font-size:12.5px;margin-bottom:14px}
+  .grp{margin-bottom:14px}
+  .grp h4{margin:0 0 7px;font-size:13px;color:var(--muted);font-weight:600}
+  .links{display:flex;gap:7px;flex-wrap:wrap}
+  .links a{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+           padding:7px 12px;font-size:13.5px;text-decoration:none;color:var(--text)}
+  .links a:hover{border-color:var(--accent)}
+  .calc{background:var(--panel-2);border-radius:10px;padding:13px}
+  .calc .fields{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end}
+  .calc label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+  .calc input{width:120px}
+  .out{margin-top:11px;font-size:14px;line-height:1.8}
+  .out .total{font-size:19px;font-weight:700;color:var(--yes)}
+  .warn{color:var(--accent);font-size:12.5px}
+
+  /* ---- settings ---- */
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+       padding:16px;margin-bottom:14px}
+  .box h3{margin:0 0 10px;font-size:16px}
+  .box p{color:var(--muted);font-size:13.5px;margin:0 0 12px}
+  .box button{background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+              padding:9px 15px;border-radius:8px;cursor:pointer;font-size:14px;margin-inline-end:7px}
+  .box button.primary{background:var(--accent);border-color:var(--accent);color:#11141a;font-weight:600}
+  .status{font-size:13px;color:var(--muted);margin-top:9px}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>מעקב לגו</h1>
+  <nav>
+    <button data-tab="swipe" class="on">סימון</button>
+    <button data-tab="new">חדשים <span id="newBadge"></span></button>
+    <button data-tab="yes">רשימת הכן <span id="yesBadge"></span></button>
+    <button data-tab="no">דחויים</button>
+    <button data-tab="settings">הגדרות</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============ SWIPE ============ -->
+  <section id="tab-swipe">
+    <div class="filters">
+      <input id="fSearch" placeholder="חיפוש שם / מספר סט">
+      <select id="fTheme"><option value="">כל הסדרות</option></select>
+      <input id="fFrom" type="number" placeholder="משנה" style="width:110px">
+      <input id="fTo" type="number" placeholder="עד שנה" style="width:110px">
+      <select id="fParts">
+        <option value="1">רק סטים עם חלקים</option>
+        <option value="0">הכל, כולל 0 חלקים</option>
+        <option value="100">100+ חלקים</option>
+        <option value="500">500+ חלקים</option>
+        <option value="1000">1000+ חלקים</option>
+      </select>
+      <select id="fOrder">
+        <option value="new">הכי חדש קודם</option>
+        <option value="old">הכי ישן קודם</option>
+        <option value="big">הכי גדול קודם</option>
+        <option value="rand">אקראי</option>
+      </select>
+    </div>
+    <div class="stage">
+      <div id="card"></div>
+      <div class="choose">
+        <button class="b-yes" onclick="decide(1)">כן</button>
+        <button class="b-no" onclick="decide(0)">לא</button>
+      </div>
+      <button class="undo" onclick="undo()">ביטול הסימון האחרון</button>
+      <div class="counts" id="counts"></div>
+      <div class="hint">מקלדת: ← לא · → כן · Z ביטול</div>
+    </div>
+  </section>
+
+  <!-- ============ NEW ============ -->
+  <section id="tab-new" class="hidden"></section>
+
+  <!-- ============ YES / NO ============ -->
+  <section id="tab-yes" class="hidden"></section>
+  <section id="tab-no" class="hidden"></section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="tab-settings" class="hidden">
+    <div class="box">
+      <h3>גיבוי הסימונים</h3>
+      <p>הסימונים נשמרים בדפדפן הזה בלבד. ייצאי קובץ גיבוי מדי פעם — אחרי שנה של עבודה
+         לא תרצי לאבד אותם בגלל ניקוי היסטוריה.</p>
+      <button class="primary" onclick="exportJson()">ייצוא לקובץ</button>
+      <button onclick="document.getElementById('importFile').click()">ייבוא מקובץ</button>
+      <input type="file" id="importFile" accept=".json" class="hidden" onchange="importJson(this)">
+      <div class="status" id="backupStatus"></div>
+    </div>
+
+    <div class="box">
+      <h3>סנכרון ל‑GitHub (אופציונלי)</h3>
+      <p>שומר את הסימונים בקובץ <code>lego/data/decisions.json</code> בריפו, כך שהם זמינים
+         מכל מכשיר. דורש Fine‑grained token עם הרשאת <b>Contents: Read and write</b> על הריפו
+         הזה בלבד. הטוקן נשמר בדפדפן שלך ולא נשלח לשום מקום חוץ מ‑GitHub.</p>
+      <div class="filters">
+        <input id="ghRepo" placeholder="owner/repo" style="width:220px">
+        <input id="ghBranch" placeholder="branch" style="width:150px">
+        <input id="ghToken" type="password" placeholder="github_pat_..." style="width:260px">
+      </div>
+      <button class="primary" onclick="ghPush()">שמירה ל‑GitHub</button>
+      <button onclick="ghPull()">טעינה מ‑GitHub</button>
+      <button onclick="ghSave()">שמירת ההגדרות</button>
+      <div class="status" id="ghStatus"></div>
+    </div>
+
+    <div class="box">
+      <h3>חישוב מיסי יבוא</h3>
+      <p>ברירת המחדל: פטור מלא עד 75$ (ערך הסחורה בלבד), ומעליו מע״מ 18% על סחורה + משלוח.
+         הסף והשיעור השתנו שלוש פעמים בשנה האחרונה — עדכני כאן אם השתנה שוב.</p>
+      <div class="filters">
+        <div><label style="font-size:12px;color:var(--muted)">סף פטור ($)</label>
+          <input id="sExempt" type="number" style="width:120px"></div>
+        <div><label style="font-size:12px;color:var(--muted)">מע״מ (%)</label>
+          <input id="sVat" type="number" style="width:120px"></div>
+        <div><label style="font-size:12px;color:var(--muted)">שער דולר‑שקל</label>
+          <input id="sRate" type="number" step="0.01" style="width:120px"></div>
+      </div>
+      <button class="primary" onclick="saveTax()">שמירה</button>
+      <div class="status" id="taxStatus"></div>
+    </div>
+
+    <div class="box">
+      <h3>נתונים</h3>
+      <div class="status" id="dataStatus"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const LS = {dec:'lego.decisions', tax:'lego.tax', gh:'lego.github'};
+const DEFAULT_TAX = {exempt:75, vat:18, rate:3.7};
+
+let catalog = null;      // parsed catalog.json
+let byNum = new Map();   // set_num -> row
+let newSets = [];        // new_sets.json entries
+let decisions = load(LS.dec, {});   // set_num -> 1 (yes) / 0 (no)
+let tax = Object.assign({}, DEFAULT_TAX, load(LS.tax, {}));
+let gh = load(LS.gh, {repo:'', branch:'main', token:''});
+let queue = [], qi = 0, history = [];
+
+function load(k, fb){ try{ return JSON.parse(localStorage.getItem(k)) ?? fb; }catch(e){ return fb; } }
+function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ alert('שמירה נכשלה: אחסון הדפדפן מלא'); } }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(n){ return Number(n).toLocaleString('he-IL'); }
+
+// ---------- data loading ----------
+async function boot(){
+  try{
+    const res = await fetch('data/catalog.json', {cache:'no-cache'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    catalog = await res.json();
+  }catch(err){
+    document.getElementById('card').innerHTML =
+      `<div class="empty">לא הצלחתי לטעון את הקטלוג.<br><br>
+       הריצי את ה‑workflow בשם <b>LEGO catalog sync</b> ב‑GitHub Actions כדי לייצר אותו.
+       <br><small>${esc(err.message)}</small></div>`;
+    return;
+  }
+  catalog.sets.forEach(r => byNum.set(r[0], r));
+  if(catalog.usd_ils && !load(LS.tax, null)) tax.rate = catalog.usd_ils;
+
+  try{
+    const r = await fetch('data/new_sets.json', {cache:'no-cache'});
+    if(r.ok) newSets = (await r.json()).sets || [];
+  }catch(e){ /* optional file */ }
+
+  const themes = [...new Set(catalog.sets.map(r => catalog.themes[r[3]] || 'Unknown'))].sort();
+  document.getElementById('fTheme').insertAdjacentHTML('beforeend',
+    themes.map(t => `<option>${esc(t)}</option>`).join(''));
+
+  document.getElementById('dataStatus').innerHTML =
+    `${num(catalog.sets.length)} סטים בקטלוג · ${num(themes.length)} סדרות ·
+     עודכן ${esc((catalog.generated||'').slice(0,10))} · מקור: ${esc(catalog.source||'')}`;
+
+  fillSettings();
+  buildQueue();
+  renderBadges();
+}
+
+function themeOf(r){ return catalog.themes[r[3]] || 'Unknown'; }
+function imgOf(r){ return r[5] ? (r[5].startsWith('http') ? r[5] : catalog.img_base + r[5]) : ''; }
+
+// ---------- queue ----------
+function buildQueue(){
+  const q = document.getElementById('fSearch').value.trim().toLowerCase();
+  const th = document.getElementById('fTheme').value;
+  const from = parseInt(document.getElementById('fFrom').value) || 0;
+  const to = parseInt(document.getElementById('fTo').value) || 9999;
+  const minParts = parseInt(document.getElementById('fParts').value);
+  const order = document.getElementById('fOrder').value;
+
+  queue = catalog.sets.filter(r => {
+    if(r[0] in decisions) return false;
+    if(r[2] < from || r[2] > to) return false;
+    if(r[4] < minParts) return false;
+    if(th && themeOf(r) !== th) return false;
+    if(q && !(r[1].toLowerCase().includes(q) || r[0].toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  if(order === 'old') queue.sort((a,b) => a[2]-b[2] || b[4]-a[4]);
+  else if(order === 'big') queue.sort((a,b) => b[4]-a[4]);
+  else if(order === 'rand') queue.sort(() => Math.random()-0.5);
+
+  qi = 0;
+  renderCard();
+}
+
+function renderCard(){
+  const el = document.getElementById('card');
+  const r = queue[qi];
+  if(!r){
+    el.innerHTML = `<div class="empty">אין סטים לסימון בסינון הנוכחי.<br>שני את הסינון למעלה.</div>`;
+  }else{
+    el.innerHTML = `<div class="card">
+      <div class="shot">${r[5] ? `<img src="${esc(imgOf(r))}" alt="" loading="lazy">`
+                              : '<span style="color:#999">אין תמונה</span>'}</div>
+      <div class="meta">
+        <h2>${esc(r[1])}</h2>
+        <div class="theme">${esc(themeOf(r))}</div>
+        <div class="facts">
+          <div class="fact"><span>מספר סט</span><b>${esc(r[0])}</b></div>
+          <div class="fact"><span>שנה</span><b>${r[2] || '—'}</b></div>
+          <div class="fact"><span>חלקים</span><b>${num(r[4])}</b></div>
+        </div>
+      </div></div>`;
+  }
+  const d = Object.keys(decisions).length;
+  const yes = Object.values(decisions).filter(v => v === 1).length;
+  document.getElementById('counts').innerHTML =
+    `נותרו בסינון: <b>${num(Math.max(queue.length - qi, 0))}</b> ·
+     סומנו בסך הכל: <b>${num(d)}</b> מתוך ${num(catalog.sets.length)} ·
+     ברשימת הכן: <b>${num(yes)}</b>`;
+}
+
+function decide(v){
+  const r = queue[qi];
+  if(!r) return;
+  decisions[r[0]] = v;
+  history.push(r[0]);
+  save(LS.dec, decisions);
+  qi++;
+  renderCard();
+  renderBadges();
+}
+
+function undo(){
+  const last = history.pop();
+  if(!last) return;
+  delete decisions[last];
+  save(LS.dec, decisions);
+  qi = Math.max(qi - 1, 0);
+  renderCard();
+  renderBadges();
+}
+
+addEventListener('keydown', e => {
+  if(document.getElementById('tab-swipe').classList.contains('hidden')) return;
+  if(/input|select|textarea/i.test(e.target.tagName)) return;
+  // The page is RTL but the arrow keys stay physical: left = no, right = yes.
+  if(e.key === 'ArrowLeft') decide(0);
+  else if(e.key === 'ArrowRight') decide(1);
+  else if(e.key.toLowerCase() === 'z') undo();
+});
+
+['fSearch','fTheme','fFrom','fTo','fParts','fOrder'].forEach(id =>
+  document.getElementById(id).addEventListener('input', buildQueue));
+
+// ---------- lists ----------
+function renderBadges(){
+  const yes = Object.values(decisions).filter(v => v === 1).length;
+  document.getElementById('yesBadge').textContent = yes ? `(${yes})` : '';
+  const pending = newSets.filter(s => !(s.num in decisions)).length;
+  document.getElementById('newBadge').textContent = pending ? `(${pending})` : '';
+}
+
+function rowHtml(r, kind){
+  const acts = kind === 'yes'
+    ? `<button class="primary" onclick="togglePrices('${esc(r[0])}')">איפה הכי זול</button>
+       <button onclick="setDecision('${esc(r[0])}',0)">הסרה</button>`
+    : `<button onclick="setDecision('${esc(r[0])}',1)">העברה לרשימת הכן</button>
+       <button onclick="setDecision('${esc(r[0])}',null)">איפוס</button>`;
+  return `<div class="row">
+    ${r[5] ? `<img src="${esc(imgOf(r))}" alt="" loading="lazy">` : '<div style="width:82px"></div>'}
+    <div class="info"><b>${esc(r[1])}</b>
+      <small><bdi>${esc(r[0])}</bdi> · ${r[2] || '—'} · ${num(r[4])} חלקים</small>
+      <small>${esc(themeOf(r))}</small></div>
+    <div class="acts">${acts}</div>
+  </div><div id="p-${esc(r[0])}"></div>`;
+}
+
+function renderList(kind){
+  const want = kind === 'yes' ? 1 : 0;
+  const rows = Object.keys(decisions)
+    .filter(n => decisions[n] === want && byNum.has(n))
+    .map(n => byNum.get(n))
+    .sort((a,b) => b[2]-a[2] || b[4]-a[4]);
+  const el = document.getElementById('tab-' + kind);
+  if(!rows.length){
+    el.innerHTML = `<div class="empty">${kind === 'yes' ? 'רשימת הכן ריקה עדיין.' : 'אין סטים דחויים.'}</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="filters"><input id="q-${kind}" placeholder="סינון ברשימה"
+      oninput="filterList('${kind}')" style="flex:1"></div>
+    <div id="list-${kind}">${rows.map(r => rowHtml(r, kind)).join('')}</div>`;
+}
+
+function filterList(kind){
+  const q = document.getElementById('q-' + kind).value.trim().toLowerCase();
+  document.querySelectorAll(`#list-${kind} .row`).forEach(row => {
+    row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function setDecision(n, v){
+  if(v === null) delete decisions[n]; else decisions[n] = v;
+  save(LS.dec, decisions);
+  renderBadges();
+  const active = document.querySelector('nav button.on').dataset.tab;
+  if(active === 'yes' || active === 'no') renderList(active);
+  if(active === 'new') renderNew();
+}
+
+function renderNew(){
+  const el = document.getElementById('tab-new');
+  const pending = newSets.filter(s => !(s.num in decisions));
+  if(!newSets.length){
+    el.innerHTML = `<div class="empty">עדיין לא נמצאו סטים חדשים.<br>
+      הסריקה רצה אוטומטית פעם ביום ומשווה את הקטלוג לגרסה של אתמול.</div>`;
+    return;
+  }
+  if(!pending.length){
+    el.innerHTML = `<div class="empty">סימנת את כל הסטים החדשים.</div>`;
+    return;
+  }
+  el.innerHTML = pending.map(s => `<div class="row">
+      ${s.img ? `<img src="${esc(s.img)}" alt="" loading="lazy">` : '<div style="width:82px"></div>'}
+      <div class="info"><b>${esc(s.name)}</b>
+        <small><bdi>${esc(s.num)}</bdi> · ${s.year || '—'} · ${num(s.parts)} חלקים</small>
+        <small>${esc(s.theme)} · נמצא ב‑${esc(s.found)}</small></div>
+      <div class="acts">
+        <button class="primary" onclick="setDecision('${esc(s.num)}',1)">כן</button>
+        <button onclick="setDecision('${esc(s.num)}',0)">לא</button>
+      </div></div>`).join('');
+}
+
+// ---------- price lookup ----------
+function links(setNum){
+  const full = setNum;
+  const base = setNum.split('-')[0];
+  const q = encodeURIComponent('lego ' + base);
+  const qHe = encodeURIComponent('לגו ' + base);
+  return {
+    'סטים סגורים – בינלאומי': [
+      ['BrickLink – מדריך מחירים', `https://www.bricklink.com/v2/catalog/catalogitem.page?S=${full}#T=P`],
+      ['BrickLink – מוכרים', `https://www.bricklink.com/v2/catalog/catalogitem.page?S=${full}#T=S`],
+      ['BrickOwl', `https://www.brickowl.com/search/catalog?query=${base}`],
+      ['eBay – חדש, זול קודם', `https://www.ebay.com/sch/i.html?_nkw=${q}&LH_ItemCondition=1000&_sop=15`],
+      ['Amazon US', `https://www.amazon.com/s?k=${q}`],
+      ['Amazon DE', `https://www.amazon.de/s?k=${q}`],
+      ['Amazon UK', `https://www.amazon.co.uk/s?k=${q}`],
+      ['LEGO רשמי (IL)', `https://www.lego.com/en-il/search?q=${base}`],
+    ],
+    'ישראל – חנויות': [
+      ['זאפ', `https://www.zap.co.il/search.aspx?keyword=${q}`],
+      ['KSP', `https://ksp.co.il/web/cat/?search=${q}`],
+      ['Google Shopping IL', `https://www.google.com/search?tbm=shop&q=${q}&gl=il&hl=he`],
+    ],
+    'ישראל – יד שנייה (חפשי "חדש באריזה")': [
+      ['יד2', `https://www.yad2.co.il/products/search?text=${qHe}`],
+      ['פייסבוק מרקטפלייס', `https://www.facebook.com/marketplace/search/?query=${q}`],
+    ],
+    'מידע ושווי': [
+      ['Brickset', `https://brickset.com/sets/${full}`],
+      ['BrickEconomy', `https://www.brickeconomy.com/search?q=${base}`],
+      ['Rebrickable', `https://rebrickable.com/sets/${full}/`],
+    ],
+  };
+}
+
+function togglePrices(setNum){
+  const host = document.getElementById('p-' + setNum);
+  if(!host) return;
+  if(host.innerHTML){ host.innerHTML = ''; return; }
+  const groups = links(setNum);
+  host.innerHTML = `<div class="prices">
+    <h3>איפה לקנות את <bdi>${esc(setNum)}</bdi> — חדש וסגור</h3>
+    <div class="sub">כל קישור נפתח בחיפוש מוכן. השווי הסופי = מחיר + משלוח + מיסים —
+      השתמשי במחשבון למטה כדי להשוות תפוחים לתפוחים.</div>
+    ${Object.entries(groups).map(([title, arr]) => `<div class="grp">
+      <h4>${esc(title)}</h4>
+      <div class="links">${arr.map(([label, url]) =>
+        `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`).join('')}</div>
+    </div>`).join('')}
+    <div class="calc">
+      <div class="fields">
+        <div><label>מחיר הסט ($)</label><input type="number" id="c1-${esc(setNum)}"
+             oninput="calc('${esc(setNum)}')" placeholder="0"></div>
+        <div><label>משלוח ($)</label><input type="number" id="c2-${esc(setNum)}"
+             oninput="calc('${esc(setNum)}')" placeholder="0"></div>
+      </div>
+      <div class="out" id="c-out-${esc(setNum)}">הזיני מחיר כדי לראות את העלות הסופית.</div>
+    </div>
+  </div>`;
+}
+
+function calc(setNum){
+  const price = parseFloat(document.getElementById('c1-' + setNum).value) || 0;
+  const ship = parseFloat(document.getElementById('c2-' + setNum).value) || 0;
+  const out = document.getElementById('c-out-' + setNum);
+  if(!price){ out.textContent = 'הזיני מחיר כדי לראות את העלות הסופית.'; return; }
+
+  // Threshold is tested against goods value alone; VAT, once due, applies to
+  // goods + shipping (+ insurance).
+  const exempt = price <= tax.exempt;
+  const vat = exempt ? 0 : (price + ship) * tax.vat / 100;
+  const usd = price + ship + vat;
+  const ils = usd * tax.rate;
+
+  out.innerHTML =
+    `סחורה: $${price.toFixed(2)} · משלוח: $${ship.toFixed(2)}<br>
+     ${exempt
+        ? `<span style="color:var(--yes)">פטור ממיסים (עד $${tax.exempt})</span>`
+        : `מע״מ ${tax.vat}%: $${vat.toFixed(2)}`}<br>
+     <span class="total">סה״כ ${ils.toLocaleString('he-IL',{maximumFractionDigits:0})} ₪</span>
+     <span style="color:var(--muted)"> ($${usd.toFixed(2)} לפי ${tax.rate})</span>
+     ${price > 500 ? '<br><span class="warn">מעל $500 ייתכנו גם מכס ומס קנייה — בדקי במחשבון של רשות המסים.</span>' : ''}`;
+}
+
+// ---------- settings ----------
+function fillSettings(){
+  sExempt.value = tax.exempt; sVat.value = tax.vat; sRate.value = tax.rate;
+  ghRepo.value = gh.repo; ghBranch.value = gh.branch; ghToken.value = gh.token;
+  backupStatus.textContent = `${num(Object.keys(decisions).length)} סימונים שמורים בדפדפן הזה.`;
+}
+
+function saveTax(){
+  tax = {exempt: parseFloat(sExempt.value) || DEFAULT_TAX.exempt,
+         vat: parseFloat(sVat.value) || DEFAULT_TAX.vat,
+         rate: parseFloat(sRate.value) || DEFAULT_TAX.rate};
+  save(LS.tax, tax);
+  taxStatus.textContent = 'נשמר.';
+}
+
+function exportJson(){
+  const blob = new Blob([JSON.stringify({exported:new Date().toISOString(), decisions}, null, 1)],
+                        {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `lego-decisions-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importJson(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      const incoming = data.decisions || data;
+      let added = 0;
+      for(const [k, v] of Object.entries(incoming)){
+        if(!(k in decisions)){ added++; }
+        decisions[k] = v;
+      }
+      save(LS.dec, decisions);
+      backupStatus.textContent = `יובאו ${num(Object.keys(incoming).length)} סימונים (${num(added)} חדשים).`;
+      buildQueue(); renderBadges();
+    }catch(e){ backupStatus.textContent = 'הקובץ לא תקין.'; }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function ghSave(){
+  gh = {repo: ghRepo.value.trim(), branch: ghBranch.value.trim() || 'main', token: ghToken.value.trim()};
+  save(LS.gh, gh);
+  ghStatus.textContent = 'ההגדרות נשמרו בדפדפן הזה.';
+}
+
+const GH_PATH = 'lego/data/decisions.json';
+
+async function ghApi(method, body){
+  const url = `https://api.github.com/repos/${gh.repo}/contents/${GH_PATH}` +
+              (method === 'GET' ? `?ref=${encodeURIComponent(gh.branch)}` : '');
+  const res = await fetch(url, {
+    method,
+    headers: {Authorization: `Bearer ${gh.token}`, Accept: 'application/vnd.github+json'},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if(!res.ok && res.status !== 404) throw new Error(`GitHub ${res.status}: ${await res.text()}`);
+  return res.status === 404 ? null : res.json();
+}
+
+async function ghPush(){
+  ghSave();
+  if(!gh.repo || !gh.token){ ghStatus.textContent = 'חסרים repo או token.'; return; }
+  ghStatus.textContent = 'שומרת...';
+  try{
+    const existing = await ghApi('GET');
+    const payload = JSON.stringify({updated:new Date().toISOString(), decisions}, null, 1);
+    await ghApi('PUT', {
+      message: `chore(lego): update decisions (${Object.keys(decisions).length})`,
+      content: btoa(unescape(encodeURIComponent(payload))),
+      branch: gh.branch,
+      sha: existing ? existing.sha : undefined,
+    });
+    ghStatus.textContent = `נשמרו ${num(Object.keys(decisions).length)} סימונים ל‑GitHub.`;
+  }catch(e){ ghStatus.textContent = 'שגיאה: ' + e.message; }
+}
+
+async function ghPull(){
+  ghSave();
+  if(!gh.repo || !gh.token){ ghStatus.textContent = 'חסרים repo או token.'; return; }
+  ghStatus.textContent = 'טוענת...';
+  try{
+    const file = await ghApi('GET');
+    if(!file){ ghStatus.textContent = 'אין עדיין קובץ סימונים בריפו.'; return; }
+    const data = JSON.parse(decodeURIComponent(escape(atob(file.content.replace(/\n/g,'')))));
+    decisions = data.decisions || data;
+    save(LS.dec, decisions);
+    buildQueue(); renderBadges(); fillSettings();
+    ghStatus.textContent = `נטענו ${num(Object.keys(decisions).length)} סימונים.`;
+  }catch(e){ ghStatus.textContent = 'שגיאה: ' + e.message; }
+}
+
+// ---------- tabs ----------
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  const tab = b.dataset.tab;
+  ['swipe','new','yes','no','settings'].forEach(t =>
+    document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab));
+  if(tab === 'yes' || tab === 'no') renderList(tab);
+  if(tab === 'new') renderNew();
+  if(tab === 'settings') fillSettings();
+  location.hash = tab;
+});
+
+if(location.hash){
+  const b = document.querySelector(`nav button[data-tab="${location.hash.slice(1)}"]`);
+  if(b) setTimeout(() => b.click(), 0);
+}
+
+boot();
+</script>
+</body>
+</html>
