@@ -14,8 +14,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: lego-catalog
@@ -54,29 +52,3 @@ jobs:
             git commit -m "chore(lego): sync catalog ($(date -u +%Y-%m-%d))"
             git push
           fi
-
-  # Publishing happens here rather than in its own workflow because a push
-  # made by GITHUB_TOKEN does not trigger one, so the site would otherwise
-  # keep serving yesterday's catalog.
-  deploy:
-    needs: sync
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Pick up the catalog the sync job just committed.
-          ref: ${{ github.ref_name }}
-
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
