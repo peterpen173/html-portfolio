@@ -140,9 +140,9 @@
 <header>
   <h1>מעקב לגו</h1>
   <nav>
-    <button data-tab="swipe" class="on">סימון</button>
+    <button data-tab="swipe" class="on">לא מוגדר</button>
     <button data-tab="new">חדשים <span id="newBadge"></span></button>
-    <button data-tab="yes">רשימת הכן <span id="yesBadge"></span></button>
+    <button data-tab="yes">לרכישה <span id="yesBadge"></span></button>
     <button data-tab="owned">האוסף שלי <span id="ownBadge"></span></button>
     <button data-tab="no">דחויים</button>
     <button data-tab="settings">הגדרות</button>
@@ -355,7 +355,7 @@ function renderCard(){
   document.getElementById('counts').innerHTML =
     `נותרו בסינון: <b>${num(Math.max(queue.length - qi, 0))}</b> ·
      סומנו בסך הכל: <b>${num(d)}</b> מתוך ${num(catalog.sets.length)} ·
-     ברשימת הכן: <b>${num(yes)}</b> · באוסף: <b>${num(own)}</b>`;
+     לרכישה: <b>${num(yes)}</b> · באוסף: <b>${num(own)}</b>`;
 }
 
 function decide(v){
@@ -407,9 +407,9 @@ const ACTS = {
   yes: r => `<button class="primary" onclick="togglePrices('${esc(r[0])}')">איפה הכי זול</button>
              <button onclick="setDecision('${esc(r[0])}',2)">קניתי</button>
              <button onclick="setDecision('${esc(r[0])}',0)">הסרה</button>`,
-  owned: r => `<button onclick="setDecision('${esc(r[0])}',1)">החזרה לרשימת הכן</button>
+  owned: r => `<button onclick="setDecision('${esc(r[0])}',1)">החזרה לרשימה לרכישה</button>
                <button onclick="setDecision('${esc(r[0])}',null)">איפוס</button>`,
-  no: r => `<button onclick="setDecision('${esc(r[0])}',1)">העברה לרשימת הכן</button>
+  no: r => `<button onclick="setDecision('${esc(r[0])}',1)">העברה לרשימה לרכישה</button>
             <button onclick="setDecision('${esc(r[0])}',null)">איפוס</button>`,
 };
 
@@ -426,9 +426,9 @@ function rowHtml(r, kind){
 
 const WANT = {yes: 1, no: 0, owned: 2};
 const EMPTY_MSG = {
-  yes: 'רשימת הכן ריקה עדיין.',
+  yes: 'רשימת הרכישה ריקה עדיין.',
   no: 'אין סטים דחויים.',
-  owned: 'עוד לא סימנת אף סט כקנוי.<br>סמני "כבר יש לי" בלשונית הסימון, או "קניתי" ברשימת הכן.',
+  owned: 'עוד לא סימנת אף סט כקנוי.<br>סמני "כבר יש לי" בלשונית "לא מוגדר", או "קניתי" ברשימה לרכישה.',
 };
 
 function renderList(kind){
