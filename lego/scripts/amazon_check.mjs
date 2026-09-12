@@ -35,14 +35,15 @@ for (const [siteName, base, sym, cur] of SITES) {
       }
       await page.waitForTimeout(3500);
 
+      // Amazon moves the title between h2, spans and aria-labels; the card's
+      // own text is the one thing that stays readable across those changes.
       const items = await page.evaluate(() => {
         const out = [];
         for (const card of document.querySelectorAll('[data-component-type="s-search-result"]')) {
-          const title = card.querySelector('h2')?.innerText?.trim() || '';
-          const whole = card.querySelector('.a-price .a-price-whole')?.innerText?.replace(/[^\d]/g, '');
-          const frac = card.querySelector('.a-price .a-price-fraction')?.innerText?.replace(/[^\d]/g, '');
+          const text = (card.innerText || '').trim();
+          const title = text.split('\n').find(l => l.trim().length > 20) || text.slice(0, 100);
           const offscreen = card.querySelector('.a-price .a-offscreen')?.textContent || '';
-          out.push({ title, whole, frac, offscreen });
+          out.push({ title: title.trim(), offscreen });
         }
         return out;
       });
@@ -50,8 +51,7 @@ for (const [siteName, base, sym, cur] of SITES) {
       const hits = items
         .filter(i => i.title.includes(set) && /lego/i.test(i.title) && !ACCESSORY.test(i.title))
         .map(i => {
-          const n = parseFloat((i.offscreen || '').replace(/[^\d.]/g, '')) ||
-                    parseFloat(`${i.whole || ''}.${i.frac || '0'}`);
+          const n = parseFloat((i.offscreen || '').replace(/[^\d.]/g, ''));
           return { title: i.title.slice(0, 72), price: n };
         })
         .filter(i => i.price > 0)
