@@ -33,6 +33,9 @@ jobs:
         id: build
         run: python lego/scripts/build_catalog.py
 
+      - name: Build Israeli price index
+        run: python lego/scripts/build_prices.py
+
       - name: Notify about new sets
         if: steps.build.outputs.new_count != '0'
         env:
