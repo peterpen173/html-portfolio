@@ -115,6 +115,23 @@
   .box button.primary{background:var(--accent);border-color:var(--accent);color:#11141a;font-weight:600}
   .status{font-size:13px;color:var(--muted);margin-top:9px}
   .empty{text-align:center;color:var(--muted);padding:50px 20px}
+  .tag{display:inline-block;background:var(--panel-2);border:1px solid var(--line);
+       border-radius:7px;padding:2px 8px;font-size:12.5px;margin-top:4px}
+  .tag.deal{border-color:var(--yes);color:var(--yes)}
+  .tag.none{color:var(--muted)}
+  .offers{width:100%;border-collapse:collapse;margin-bottom:6px}
+  .offers th{text-align:start;font-size:12px;color:var(--muted);font-weight:600;
+             padding:0 8px 7px;border-bottom:1px solid var(--line)}
+  .offers td{padding:9px 8px;border-bottom:1px solid var(--line);font-size:13.5px;
+             vertical-align:middle}
+  .offers tr:last-child td{border-bottom:none}
+  .offers .p{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .offers tr.best .p{color:var(--yes)}
+  .offers .go{background:var(--accent);color:#11141a;border-radius:7px;padding:6px 12px;
+              text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap}
+  .stock{font-size:12px} .stock.in{color:var(--yes)} .stock.out{color:var(--muted)}
+  details.more{margin-top:6px}
+  details.more summary{cursor:pointer;color:var(--muted);font-size:13px;padding:6px 0}
 
   @media (max-width:560px){
     header{padding:10px 12px;gap:8px}
@@ -254,10 +271,12 @@ const DEFAULT_TAX = {exempt:75, vat:18, rate:3.7};
 let catalog = null;      // parsed catalog.json
 let byNum = new Map();   // set_num -> row
 let newSets = [];        // new_sets.json entries
+let priceIndex = null;   // prices.json: Israeli shop offers per set
 let decisions = load(LS.dec, {});   // set_num -> 1 (yes) / 0 (no) / 2 (owned)
 let tax = Object.assign({}, DEFAULT_TAX, load(LS.tax, {}));
 let gh = load(LS.gh, {repo:'', branch:'main', token:''});
 let queue = [], qi = 0, history = [];
+let listSort = 'cheap';
 const THIS_YEAR = new Date().getFullYear();
 
 function load(k, fb){ try{ return JSON.parse(localStorage.getItem(k)) ?? fb; }catch(e){ return fb; } }
@@ -286,6 +305,11 @@ async function boot(){
     if(r.ok) newSets = (await r.json()).sets || [];
   }catch(e){ /* optional file */ }
 
+  try{
+    const r = await fetch('data/prices.json', {cache:'no-cache'});
+    if(r.ok) priceIndex = await r.json();
+  }catch(e){ /* optional file */ }
+
   const themes = [...new Set(catalog.sets.map(r => catalog.themes[r[3]] || 'Unknown'))].sort();
   document.getElementById('fTheme').insertAdjacentHTML('beforeend',
     themes.map(t => `<option>${esc(t)}</option>`).join(''));
@@ -300,6 +324,13 @@ async function boot(){
 }
 
 function themeOf(r){ return catalog.themes[r[3]] || 'Unknown'; }
+function baseNum(setNum){ return setNum.split('-')[0]; }
+function offersFor(setNum){ return priceIndex?.prices?.[baseNum(setNum)] || []; }
+function cheapest(setNum){
+  const inStock = offersFor(setNum).filter(o => o.in_stock);
+  return inStock.length ? inStock[0] : (offersFor(setNum)[0] || null);
+}
+function shekel(n){ return '₪' + Number(n).toLocaleString('he-IL', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 function imgOf(r){ return r[5] ? (r[5].startsWith('http') ? r[5] : catalog.img_base + r[5]) : ''; }
 
 // ---------- queue ----------
@@ -415,11 +446,16 @@ const ACTS = {
 
 function rowHtml(r, kind){
   const acts = ACTS[kind](r);
+  const best = kind === 'yes' ? cheapest(r[0]) : null;
+  const badge = kind !== 'yes' ? '' :
+    best ? `<div class="tag ${best.in_stock ? 'deal' : ''}">${shekel(best.price)} ·
+            ${esc(best.shop_name)}${best.in_stock ? '' : ' (אזל)'}</div>`
+         : '<div class="tag none">לא נמצא בחנויות בארץ</div>';
   return `<div class="row">
     ${r[5] ? `<img src="${esc(imgOf(r))}" alt="" loading="lazy">` : '<div style="width:82px"></div>'}
     <div class="info"><b>${esc(r[1])}</b>
       <small><bdi>${esc(r[0])}</bdi> · ${r[2] || '—'} · ${num(r[4])} חלקים</small>
-      <small>${esc(themeOf(r))}</small></div>
+      <small>${esc(themeOf(r))}</small>${badge}</div>
     <div class="acts">${acts}</div>
   </div><div id="p-${esc(r[0])}"></div>`;
 }
@@ -443,8 +479,23 @@ function renderList(kind){
     el.innerHTML = `<div class="empty">${EMPTY_MSG[kind]}</div>`;
     return;
   }
+  if(kind === 'yes'){
+    const mode = document.getElementById('ySort')?.value || listSort;
+    listSort = mode;
+    if(mode === 'cheap'){
+      const key = r => { const c = cheapest(r[0]); return c ? c.price : Infinity; };
+      rows.sort((a, b) => key(a) - key(b));
+    } else if(mode === 'big'){ rows.sort((a, b) => b[4] - a[4]); }
+  }
+  const sorter = kind !== 'yes' ? '' :
+    `<select id="ySort" onchange="renderList('yes')">
+       <option value="cheap"${listSort==='cheap'?' selected':''}>הזול ביותר קודם</option>
+       <option value="new"${listSort==='new'?' selected':''}>הכי חדש קודם</option>
+       <option value="big"${listSort==='big'?' selected':''}>הכי גדול קודם</option>
+     </select>`;
   el.innerHTML = stats + `<div class="filters"><input id="q-${kind}" placeholder="סינון ברשימה"
-      oninput="filterList('${kind}')" style="flex:1"></div>
+      oninput="filterList('${kind}')" style="flex:1">${sorter}</div>
+    ${kind === 'yes' ? priceSummary(rows) : ''}
     <div id="list-${kind}">${rows.map(r => rowHtml(r, kind)).join('')}</div>`;
 }
 
@@ -559,29 +610,60 @@ function links(setNum){
   };
 }
 
+function priceSummary(rows){
+  if(!priceIndex) return '';
+  const withPrice = rows.filter(r => cheapest(r[0]));
+  const total = withPrice.reduce((a, r) => a + cheapest(r[0]).price, 0);
+  const when = (priceIndex.generated || '').slice(0, 10);
+  return `<div class="ranked" style="margin-bottom:14px">
+    <h3>מחירים בישראל</h3>
+    <div class="sub">${num(withPrice.length)} מתוך ${num(rows.length)} סטים ברשימה נמצאו בחנות בארץ ·
+      עלות הכל בזול ביותר: <b>${shekel(total)}</b> · עודכן ${esc(when)}</div>
+  </div>`;
+}
+
 function togglePrices(setNum){
   const host = document.getElementById('p-' + setNum);
   if(!host) return;
   if(host.innerHTML){ host.innerHTML = ''; return; }
+
+  const offers = offersFor(setNum);
   const groups = links(setNum);
+  const rows = offers.map((o, i) => `<tr class="${i === 0 && o.in_stock ? 'best' : ''}">
+      <td class="p">${shekel(o.price)}</td>
+      <td>${esc(o.shop_name)}<br><span class="stock ${o.in_stock ? 'in' : 'out'}">
+        ${o.in_stock ? 'במלאי' : 'אזל מהמלאי'}</span></td>
+      <td style="text-align:end"><a class="go" href="${esc(o.url)}"
+        target="_blank" rel="noopener noreferrer">לחנות</a></td>
+    </tr>`).join('');
+
   host.innerHTML = `<div class="prices">
-    <h3>איפה לקנות את <bdi>${esc(setNum)}</bdi> — חדש וסגור</h3>
-    <div class="sub">כל קישור נפתח בחיפוש מוכן. השווי הסופי = מחיר + משלוח + מיסים —
-      השתמשי במחשבון למטה כדי להשוות תפוחים לתפוחים.</div>
-    ${Object.entries(groups).map(([title, arr]) => `<div class="grp">
-      <h4>${esc(title)}</h4>
-      <div class="links">${arr.map(([label, url]) =>
-        `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`).join('')}</div>
-    </div>`).join('')}
-    <div class="calc">
-      <div class="fields">
-        <div><label>מחיר הסט ($)</label><input type="number" id="c1-${esc(setNum)}"
-             oninput="calc('${esc(setNum)}')" placeholder="0"></div>
-        <div><label>משלוח ($)</label><input type="number" id="c2-${esc(setNum)}"
-             oninput="calc('${esc(setNum)}')" placeholder="0"></div>
+    <h3>איפה לקנות את <bdi>${esc(setNum)}</bdi></h3>
+    ${offers.length
+      ? `<div class="sub">מחירי החנויות בארץ, כולל מע״מ, לפני דמי משלוח. עודכן
+           ${esc((priceIndex?.generated || '').slice(0,10))}.</div>
+         <table class="offers"><thead><tr><th>מחיר</th><th>חנות</th><th></th></tr></thead>
+         <tbody>${rows}</tbody></table>`
+      : `<div class="sub">הסט לא נמצא במלאי של החנויות בארץ שאנחנו סורקים
+           (לגו ישראל הרשמי, Brickland, ToysRUs). כנראה יצא מייצור — כדאי לחפש בחו״ל למטה.</div>`}
+
+    <details class="more">
+      <summary>חיפוש ידני בחו״ל ובשוק היד שנייה</summary>
+      ${Object.entries(groups).map(([title, arr]) => `<div class="grp">
+        <h4>${esc(title)}</h4>
+        <div class="links">${arr.map(([label, url]) =>
+          `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`).join('')}</div>
+      </div>`).join('')}
+      <div class="calc">
+        <div class="fields">
+          <div><label>מחיר הסט ($)</label><input type="number" id="c1-${esc(setNum)}"
+               oninput="calc('${esc(setNum)}')" placeholder="0"></div>
+          <div><label>משלוח ($)</label><input type="number" id="c2-${esc(setNum)}"
+               oninput="calc('${esc(setNum)}')" placeholder="0"></div>
+        </div>
+        <div class="out" id="c-out-${esc(setNum)}">הזיני מחיר כדי להשוות לעלות בארץ.</div>
       </div>
-      <div class="out" id="c-out-${esc(setNum)}">הזיני מחיר כדי לראות את העלות הסופית.</div>
-    </div>
+    </details>
   </div>`;
 }
 
@@ -605,7 +687,15 @@ function calc(setNum){
         : `מע״מ ${tax.vat}%: $${vat.toFixed(2)}`}<br>
      <span class="total">סה״כ ${ils.toLocaleString('he-IL',{maximumFractionDigits:0})} ₪</span>
      <span style="color:var(--muted)"> ($${usd.toFixed(2)} לפי ${tax.rate})</span>
-     ${price > 500 ? '<br><span class="warn">מעל $500 ייתכנו גם מכס ומס קנייה — בדקי במחשבון של רשות המסים.</span>' : ''}`;
+     ${price > 500 ? '<br><span class="warn">מעל $500 ייתכנו גם מכס ומס קנייה — בדקי במחשבון של רשות המסים.</span>' : ''}
+     ${(() => {
+        const best = cheapest(setNum);
+        if(!best) return '';
+        const diff = ils - best.price;
+        return `<br><span style="color:${diff < 0 ? 'var(--yes)' : 'var(--no)'}">` +
+               (diff < 0 ? `זול ב־${shekel(-diff)} מהמחיר בארץ` : `יקר ב־${shekel(diff)} מהמחיר בארץ`) +
+               ` (${esc(best.shop_name)}: ${shekel(best.price)})</span>`;
+      })()}`;
 }
 
 // ---------- settings ----------
