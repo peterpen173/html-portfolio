@@ -5,6 +5,12 @@ on:
     # 05:10 UTC daily — Rebrickable regenerates its dumps overnight.
     - cron: "10 5 * * *"
   workflow_dispatch:
+  # Also run when the sync code itself changes, so a rebuild can be kicked off
+  # from a feature branch without waiting for the nightly schedule.
+  push:
+    paths:
+      - "lego/scripts/**"
+      - ".github/workflows/lego-catalog.yml"
 
 permissions:
   contents: write
