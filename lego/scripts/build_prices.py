@@ -33,6 +33,21 @@ SHOPS = [
      "base": "https://www.brickland.co.il", "vendors": ("lego",)},
     {"id": "toysrus", "name": "ToysRUs ישראל",
      "base": "https://www.toysrus.co.il", "vendors": ("lego",)},
+    {"id": "shilav", "name": "שילב",
+     "base": "https://www.shilav.com", "vendors": ("lego",)},
+]
+
+# Shops that cannot be indexed, and why. Shown in the app so a price is never
+# presented as the cheapest anywhere when whole retailers are missing from it.
+NOT_COVERED = [
+    {"name": "KSP", "reason": "חוסמת קריאה אוטומטית (403)",
+     "search": "https://ksp.co.il/web/cat/?search=lego+{num}"},
+    {"name": "אייבורי", "reason": "robots.txt אוסר סריקה",
+     "search": "https://www.ivory.co.il/catalog?search=lego+{num}"},
+    {"name": "לאסט פרייס", "reason": "חוסמת קריאה אוטומטית (403)",
+     "search": "https://www.lastprice.co.il/search?q=lego+{num}"},
+    {"name": "זאפ", "reason": "אין פיד מוצרים ציבורי",
+     "search": "https://www.zap.co.il/search.aspx?keyword=lego+{num}"},
 ]
 
 # Modern LEGO set numbers are 4-7 digits. Three-digit numbers exist only in the
@@ -176,6 +191,7 @@ def main():
         "currency": "ILS",
         "note": "מחיר המוצר בחנות, כולל מע\"מ, לפני דמי משלוח",
         "shops": shops_meta,
+        "not_covered": NOT_COVERED,
         "prices": prices,
     }
     path = os.path.join(DATA, "prices.json")

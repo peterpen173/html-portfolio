@@ -132,6 +132,19 @@
   .stock{font-size:12px} .stock.in{color:var(--yes)} .stock.out{color:var(--muted)}
   details.more{margin-top:6px}
   details.more summary{cursor:pointer;color:var(--muted);font-size:13px;padding:6px 0}
+  .gap{background:rgba(240,180,41,.08);border:1px solid var(--accent);border-radius:10px;
+       padding:11px 13px;margin:4px 0 14px;font-size:13px;line-height:1.7}
+  .gap b{color:var(--accent)}
+  .gap .links{margin-top:8px}
+  .offers tr.mine td{background:rgba(118,169,250,.07)}
+  .mine-tag{font-size:11px;color:var(--own);border:1px solid var(--own);
+            border-radius:5px;padding:1px 6px;margin-inline-start:6px}
+  .addp{display:flex;gap:7px;flex-wrap:wrap;align-items:flex-end;margin-top:10px}
+  .addp input{background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+              padding:7px 10px;border-radius:7px;font:inherit;font-size:13px}
+  .addp button{background:var(--own);border:none;color:#11141a;font-weight:600;
+               padding:8px 14px;border-radius:7px;cursor:pointer;font-size:13px}
+  .del{background:none;border:none;color:var(--no);cursor:pointer;font-size:16px;padding:0 6px}
 
   @media (max-width:560px){
     header{padding:10px 12px;gap:8px}
@@ -265,13 +278,16 @@
 </main>
 
 <script>
-const LS = {dec:'lego.decisions', tax:'lego.tax', gh:'lego.github'};
+const LS = {dec:'lego.decisions', tax:'lego.tax', gh:'lego.github', mine:'lego.myprices'};
 const DEFAULT_TAX = {exempt:75, vat:18, rate:3.7};
 
 let catalog = null;      // parsed catalog.json
 let byNum = new Map();   // set_num -> row
 let newSets = [];        // new_sets.json entries
 let priceIndex = null;   // prices.json: Israeli shop offers per set
+// Prices the user found herself, in shops the index cannot reach (KSP, Yad2,
+// Facebook). Same shape as an indexed offer so everything sorts together.
+let myPrices = load(LS.mine, {});
 let decisions = load(LS.dec, {});   // set_num -> 1 (yes) / 0 (no) / 2 (owned)
 let tax = Object.assign({}, DEFAULT_TAX, load(LS.tax, {}));
 let gh = load(LS.gh, {repo:'', branch:'main', token:''});
@@ -325,7 +341,38 @@ async function boot(){
 
 function themeOf(r){ return catalog.themes[r[3]] || 'Unknown'; }
 function baseNum(setNum){ return setNum.split('-')[0]; }
-function offersFor(setNum){ return priceIndex?.prices?.[baseNum(setNum)] || []; }
+function offersFor(setNum){
+  const indexed = priceIndex?.prices?.[baseNum(setNum)] || [];
+  const mine = (myPrices[baseNum(setNum)] || []).map(o => ({...o, mine: true, in_stock: true}));
+  return [...indexed, ...mine].sort((a, b) => (!a.in_stock) - (!b.in_stock) || a.price - b.price);
+}
+
+function addPrice(setNum){
+  const base = baseNum(setNum);
+  const shop = document.getElementById('mp-shop-' + setNum).value.trim();
+  const price = parseFloat(document.getElementById('mp-price-' + setNum).value);
+  const url = document.getElementById('mp-url-' + setNum).value.trim();
+  if(!shop || !(price > 0)){
+    document.getElementById('mp-msg-' + setNum).textContent = 'צריך שם חנות ומחיר.';
+    return;
+  }
+  (myPrices[base] = myPrices[base] || []).push({
+    shop: 'mine', shop_name: shop, price: Math.round(price * 100) / 100,
+    url, added: new Date().toISOString().slice(0, 10),
+  });
+  save(LS.mine, myPrices);
+  togglePrices(setNum); togglePrices(setNum);   // redraw the panel
+  renderList('yes');
+}
+
+function removePrice(setNum, i){
+  const base = baseNum(setNum);
+  (myPrices[base] || []).splice(i, 1);
+  if(!myPrices[base].length) delete myPrices[base];
+  save(LS.mine, myPrices);
+  togglePrices(setNum); togglePrices(setNum);
+  renderList('yes');
+}
 function cheapest(setNum){
   const inStock = offersFor(setNum).filter(o => o.in_stock);
   return inStock.length ? inStock[0] : (offersFor(setNum)[0] || null);
@@ -435,7 +482,7 @@ function renderBadges(){
 }
 
 const ACTS = {
-  yes: r => `<button class="primary" onclick="togglePrices('${esc(r[0])}')">איפה הכי זול</button>
+  yes: r => `<button class="primary" onclick="togglePrices('${esc(r[0])}')">השוואת מחירים</button>
              <button onclick="setDecision('${esc(r[0])}',2)">קניתי</button>
              <button onclick="setDecision('${esc(r[0])}',0)">הסרה</button>`,
   owned: r => `<button onclick="setDecision('${esc(r[0])}',1)">החזרה לרשימה לרכישה</button>
@@ -610,6 +657,24 @@ function links(setNum){
   };
 }
 
+// The index covers some shops and not others. Saying which, every time, is the
+// difference between "cheapest we found" and a false claim of "cheapest".
+function gapNotice(setNum){
+  const base = baseNum(setNum);
+  const covered = (priceIndex?.shops || []).map(s => s.name).join(', ');
+  const gaps = priceIndex?.not_covered || [];
+  if(!gaps.length) return '';
+  return `<div class="gap">
+    נסרקות אוטומטית: <b>${esc(covered || '—')}</b>.
+    חנויות שחוסמות סריקה ולכן <b>לא נכללות</b> בהשוואה —
+    ${gaps.map(g => esc(g.name)).join(', ')}. בדקי בהן ידנית, ואם מצאת זול יותר
+    הוסיפי את המחיר למטה כדי שייכנס להשוואה.
+    <div class="links">${gaps.map(g =>
+      `<a href="${esc(g.search.replace('{num}', encodeURIComponent(base)))}"
+         target="_blank" rel="noopener noreferrer">${esc(g.name)}</a>`).join('')}</div>
+  </div>`;
+}
+
 function priceSummary(rows){
   if(!priceIndex) return '';
   const withPrice = rows.filter(r => cheapest(r[0]));
@@ -617,8 +682,12 @@ function priceSummary(rows){
   const when = (priceIndex.generated || '').slice(0, 10);
   return `<div class="ranked" style="margin-bottom:14px">
     <h3>מחירים בישראל</h3>
-    <div class="sub">${num(withPrice.length)} מתוך ${num(rows.length)} סטים ברשימה נמצאו בחנות בארץ ·
-      עלות הכל בזול ביותר: <b>${shekel(total)}</b> · עודכן ${esc(when)}</div>
+    <div class="sub">${num(withPrice.length)} מתוך ${num(rows.length)} סטים ברשימה נמצאו ·
+      עלות הכל בזול ביותר שנמצא: <b>${shekel(total)}</b> · עודכן ${esc(when)}<br>
+      נסרקות: ${esc((priceIndex.shops || []).map(s => s.name).join(', '))}.
+      ${(priceIndex.not_covered || []).length
+        ? 'חנויות כמו ' + esc((priceIndex.not_covered || []).map(g => g.name).join(', ')) +
+          ' חוסמות סריקה ולא נכללות — ייתכן שיהיה שם זול יותר.' : ''}</div>
   </div>`;
 }
 
@@ -629,16 +698,26 @@ function togglePrices(setNum){
 
   const offers = offersFor(setNum);
   const groups = links(setNum);
-  const rows = offers.map((o, i) => `<tr class="${i === 0 && o.in_stock ? 'best' : ''}">
+  let mineSeen = -1;
+  const rows = offers.map((o, i) => {
+    if(o.mine) mineSeen++;
+    const idx = mineSeen;
+    return `<tr class="${i === 0 && o.in_stock ? 'best' : ''} ${o.mine ? 'mine' : ''}">
       <td class="p">${shekel(o.price)}</td>
-      <td>${esc(o.shop_name)}<br><span class="stock ${o.in_stock ? 'in' : 'out'}">
-        ${o.in_stock ? 'במלאי' : 'אזל מהמלאי'}</span></td>
-      <td style="text-align:end"><a class="go" href="${esc(o.url)}"
-        target="_blank" rel="noopener noreferrer">לחנות</a></td>
-    </tr>`).join('');
+      <td>${esc(o.shop_name)}${o.mine ? '<span class="mine-tag">הוספת ידנית</span>' : ''}
+        <br><span class="stock ${o.in_stock ? 'in' : 'out'}">
+        ${o.mine ? 'נבדק ' + esc(o.added) : (o.in_stock ? 'במלאי' : 'אזל מהמלאי')}</span></td>
+      <td style="text-align:end">
+        ${o.url ? `<a class="go" href="${esc(o.url)}" target="_blank"
+                     rel="noopener noreferrer">לחנות</a>` : ''}
+        ${o.mine ? `<button class="del" title="מחיקה"
+                      onclick="removePrice('${esc(setNum)}',${idx})">×</button>` : ''}
+      </td></tr>`;
+  }).join('');
 
   host.innerHTML = `<div class="prices">
     <h3>איפה לקנות את <bdi>${esc(setNum)}</bdi></h3>
+    ${gapNotice(setNum)}
     ${offers.length
       ? `<div class="sub">מחירי החנויות בארץ, כולל מע״מ, לפני דמי משלוח. עודכן
            ${esc((priceIndex?.generated || '').slice(0,10))}.</div>
@@ -646,6 +725,17 @@ function togglePrices(setNum){
          <tbody>${rows}</tbody></table>`
       : `<div class="sub">הסט לא נמצא במלאי של החנויות בארץ שאנחנו סורקים
            (לגו ישראל הרשמי, Brickland, ToysRUs). כנראה יצא מייצור — כדאי לחפש בחו״ל למטה.</div>`}
+
+    <div class="calc" style="margin-bottom:12px">
+      <label style="font-size:12px;color:var(--muted)">מצאת מחיר טוב יותר? הוסיפי אותו להשוואה</label>
+      <div class="addp">
+        <input id="mp-shop-${esc(setNum)}" placeholder="שם החנות" style="width:130px">
+        <input id="mp-price-${esc(setNum)}" type="number" placeholder="מחיר ₪" style="width:110px">
+        <input id="mp-url-${esc(setNum)}" placeholder="קישור (לא חובה)" style="flex:1;min-width:160px">
+        <button onclick="addPrice('${esc(setNum)}')">הוספה</button>
+      </div>
+      <div class="status" id="mp-msg-${esc(setNum)}"></div>
+    </div>
 
     <details class="more">
       <summary>חיפוש ידני בחו״ל ובשוק היד שנייה</summary>
@@ -714,7 +804,7 @@ function saveTax(){
 }
 
 function exportJson(){
-  const blob = new Blob([JSON.stringify({exported:new Date().toISOString(), decisions}, null, 1)],
+  const blob = new Blob([JSON.stringify({exported:new Date().toISOString(), decisions, myPrices}, null, 1)],
                         {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -730,6 +820,7 @@ function importJson(input){
   reader.onload = () => {
     try{
       const data = JSON.parse(reader.result);
+      if(data.myPrices){ myPrices = {...myPrices, ...data.myPrices}; save(LS.mine, myPrices); }
       const incoming = data.decisions || data;
       let added = 0;
       for(const [k, v] of Object.entries(incoming)){
