@@ -115,6 +115,24 @@
   .box button.primary{background:var(--accent);border-color:var(--accent);color:#11141a;font-weight:600}
   .status{font-size:13px;color:var(--muted);margin-top:9px}
   .empty{text-align:center;color:var(--muted);padding:50px 20px}
+
+  @media (max-width:560px){
+    header{padding:10px 12px;gap:8px}
+    nav{margin-inline-start:0;width:100%}
+    nav button{flex:1;padding:6px 8px;font-size:13px}
+    main{padding:12px}
+    .filters input,.filters select{flex:1;min-width:130px}
+    .row{flex-wrap:wrap}
+    .row img{width:64px;height:50px}
+    .row .acts{width:100%;justify-content:stretch}
+    .row .acts button{flex:1}
+    .choose button{padding:18px;font-size:18px}
+    .bar-row{grid-template-columns:1fr;gap:2px;padding:7px 0}
+    .bar-row .val{text-align:start}
+    .kpi{min-width:100%}
+    .calc input{width:100%}
+    .calc .fields>div{flex:1}
+  }
 </style>
 </head>
 <body>
@@ -145,6 +163,10 @@
         <option value="100">100+ חלקים</option>
         <option value="500">500+ חלקים</option>
         <option value="1000">1000+ חלקים</option>
+      </select>
+      <select id="fFuture">
+        <option value="0">רק סטים שכבר יצאו</option>
+        <option value="1">כולל סטים שטרם יצאו</option>
       </select>
       <select id="fOrder">
         <option value="new">הכי חדש קודם</option>
@@ -236,6 +258,7 @@ let decisions = load(LS.dec, {});   // set_num -> 1 (yes) / 0 (no) / 2 (owned)
 let tax = Object.assign({}, DEFAULT_TAX, load(LS.tax, {}));
 let gh = load(LS.gh, {repo:'', branch:'main', token:''});
 let queue = [], qi = 0, history = [];
+const THIS_YEAR = new Date().getFullYear();
 
 function load(k, fb){ try{ return JSON.parse(localStorage.getItem(k)) ?? fb; }catch(e){ return fb; } }
 function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ alert('שמירה נכשלה: אחסון הדפדפן מלא'); } }
@@ -287,10 +310,13 @@ function buildQueue(){
   const to = parseInt(document.getElementById('fTo').value) || 9999;
   const minParts = parseInt(document.getElementById('fParts').value);
   const order = document.getElementById('fOrder').value;
+  // Rebrickable lists sets a year or more ahead of their release. Only the
+  // year is known, so "released" means the year has arrived.
+  const maxYear = document.getElementById('fFuture').value === '1' ? 9999 : THIS_YEAR;
 
   queue = catalog.sets.filter(r => {
     if(r[0] in decisions) return false;
-    if(r[2] < from || r[2] > to) return false;
+    if(r[2] < from || r[2] > to || r[2] > maxYear) return false;
     if(r[4] < minParts) return false;
     if(th && themeOf(r) !== th) return false;
     if(q && !(r[1].toLowerCase().includes(q) || r[0].toLowerCase().includes(q))) return false;
@@ -363,7 +389,7 @@ addEventListener('keydown', e => {
   else if(e.key.toLowerCase() === 'z') undo();
 });
 
-['fSearch','fTheme','fFrom','fTo','fParts','fOrder'].forEach(id =>
+['fSearch','fTheme','fFrom','fTo','fParts','fFuture','fOrder'].forEach(id =>
   document.getElementById(id).addEventListener('input', buildQueue));
 
 // ---------- lists ----------
@@ -475,14 +501,16 @@ function setDecision(n, v){
 
 function renderNew(){
   const el = document.getElementById('tab-new');
-  const pending = newSets.filter(s => !(s.num in decisions));
+  const showFuture = document.getElementById('fFuture').value === '1';
+  const pending = newSets.filter(s => !(s.num in decisions) && (showFuture || s.year <= THIS_YEAR));
   if(!newSets.length){
     el.innerHTML = `<div class="empty">עדיין לא נמצאו סטים חדשים.<br>
       הסריקה רצה אוטומטית פעם ביום ומשווה את הקטלוג לגרסה של אתמול.</div>`;
     return;
   }
   if(!pending.length){
-    el.innerHTML = `<div class="empty">סימנת את כל הסטים החדשים.</div>`;
+    el.innerHTML = `<div class="empty">אין סטים חדשים לסימון כרגע.<br>
+      <small>סטים שהוכרזו לשנים הבאות יופיעו כאן כשהשנה שלהם תגיע.</small></div>`;
     return;
   }
   el.innerHTML = pending.map(s => `<div class="row">
