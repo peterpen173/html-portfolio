@@ -7,6 +7,7 @@ on:
   push:
     paths:
       - "lego/scripts/probe_sources.py"
+      - "lego/scripts/probe_shopify.py"
       - ".github/workflows/probe-sources.yml"
 
 permissions:
@@ -21,3 +22,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: python lego/scripts/probe_sources.py
+      - run: python lego/scripts/probe_shopify.py
