@@ -1,0 +1,25 @@
+name: Probe with a real browser
+
+# Research only. Establishes whether the shops that refuse a plain HTTP
+# request will serve the same public page to an actual browser.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "lego/scripts/probe_browser.mjs"
+      - ".github/workflows/probe-browser.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm init -y && npm i playwright@1.49.0
+      - run: npx playwright install --with-deps chromium
+      - run: node lego/scripts/probe_browser.mjs
