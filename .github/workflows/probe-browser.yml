@@ -7,6 +7,7 @@ on:
   push:
     paths:
       - "lego/scripts/probe_browser.mjs"
+      - "lego/scripts/amazon_check.mjs"
       - ".github/workflows/probe-browser.yml"
 
 permissions:
@@ -22,4 +23,4 @@ jobs:
           node-version: "20"
       - run: npm init -y && npm i playwright@1.49.0
       - run: npx playwright install --with-deps chromium
-      - run: node lego/scripts/probe_browser.mjs
+      - run: node lego/scripts/amazon_check.mjs
