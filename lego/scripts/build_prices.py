@@ -33,8 +33,10 @@ SHOPS = [
      "base": "https://www.brickland.co.il", "vendors": ("lego",)},
     {"id": "toysrus", "name": "ToysRUs ישראל",
      "base": "https://www.toysrus.co.il", "vendors": ("lego",)},
+    # Shilav does not put LEGO in the vendor field, so the whole record is
+    # searched instead; the scored match still decides what is really a set.
     {"id": "shilav", "name": "שילב",
-     "base": "https://www.shilav.com", "vendors": ("lego",)},
+     "base": "https://www.shilav.com", "vendors": ("lego", "לגו"), "match": "any"},
 ]
 
 # Shops that cannot be indexed, and why. Shown in the app so a price is never
@@ -133,8 +135,12 @@ def best_match(product, catalog):
 def offers_from(shop, products, catalog):
     out, matched, skipped = {}, 0, 0
     for p in products:
-        vendor = (p.get("vendor") or "").lower()
-        if not any(k in vendor for k in shop["vendors"]):
+        if shop.get("match") == "any":
+            haystack = " ".join([p.get("vendor") or "", p.get("title") or "",
+                                 p.get("product_type") or ""]).lower()
+        else:
+            haystack = (p.get("vendor") or "").lower()
+        if not any(k in haystack for k in shop["vendors"]):
             continue
         num, _ = best_match(p, catalog)
         if not num:
@@ -179,8 +185,11 @@ def main():
         found = offers_from(shop, products, catalog)
         for num, offer in found.items():
             prices.setdefault(num, []).append(offer)
-        shops_meta.append({"id": shop["id"], "name": shop["name"],
-                           "base": shop["base"], "sets": len(found)})
+        if found:
+            shops_meta.append({"id": shop["id"], "name": shop["name"],
+                               "base": shop["base"], "sets": len(found)})
+        else:
+            print("    no sets matched — left out of the covered list")
         print()
 
     for num in prices:
