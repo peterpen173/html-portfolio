@@ -1,4 +1,32 @@
 {
- "generated": "2026-09-12T08:52:28+00:00",
- "sets": []
+ "generated": "2026-09-12T08:55:45+00:00",
+ "sets": [
+  {
+   "found": "2026-09-12",
+   "num": "L0002240-1",
+   "name": "Clone Trooper",
+   "year": 2026,
+   "theme": "Star Wars",
+   "parts": 1,
+   "img": "https://cdn.rebrickable.com/media/sets/l0002240-1.jpg"
+  },
+  {
+   "found": "2026-09-12",
+   "num": "L0002207-1",
+   "name": "Acid Monster",
+   "year": 2026,
+   "theme": "Ninjago",
+   "parts": 8,
+   "img": "https://cdn.rebrickable.com/media/sets/l0002207-1.jpg"
+  },
+  {
+   "found": "2026-09-12",
+   "num": "10371-1",
+   "name": "Cozy Plants",
+   "year": 2026,
+   "theme": "Botanicals",
+   "parts": 0,
+   "img": "https://cdn.rebrickable.com/media/sets/10371-1.jpg"
+  }
+ ]
 }
