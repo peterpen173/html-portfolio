@@ -8,6 +8,7 @@ on:
     paths:
       - "lego/scripts/probe_sources.py"
       - "lego/scripts/probe_shopify.py"
+      - "lego/scripts/probe_match.py"
       - ".github/workflows/probe-sources.yml"
 
 permissions:
@@ -21,5 +22,4 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python lego/scripts/probe_sources.py
-      - run: python lego/scripts/probe_shopify.py
+      - run: python lego/scripts/probe_match.py
